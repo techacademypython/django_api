@@ -1,8 +1,14 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import get_user_model, authenticate
 from api.models import News
 import json
+from api.serializers import UserSerializer
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+
+User = get_user_model()
 
 
 # Create your views here.
@@ -78,3 +84,51 @@ def api_news_update(request, id):
         })
 
 
+class LoginApi(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, *args, **kwargs):
+        data = json.loads(self.request.body.decode("utf-8"))
+        user = authenticate(
+            username=data["username"],
+            password=data["password"]
+        )
+        if user:
+            if user.is_active:
+                return JsonResponse({
+                    "token": user.auth_token.key
+                })
+            else:
+                return JsonResponse({
+                    "message": "User is not active"
+                })
+        else:
+            return JsonResponse({
+                "message": "Invalid credentials"
+            })
+
+
+class RegsiterApi(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, *args, **kwargs):
+        data = json.loads(self.request.body.decode("utf-8"))
+        user = User.objects.create_user(
+            username=data["username"],
+            password=data["password"]
+        )
+        serializer = UserSerializer(user)
+        return JsonResponse({
+            "status": "Created",
+            "token": user.auth_token.key,
+            "data": serializer.data
+        }, status=201)
+
+
+class PrivateApi(APIView):
+
+    def get(self, *args, **kwargs):
+        return JsonResponse({
+            "message": "Siz artiq login olmusuz",
+            "username": self.request.user.username
+        })
